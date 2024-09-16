@@ -38,13 +38,21 @@ export class ComfyUIClient {
     this.clientId = clientId;
   }
 
+  // Comfy URL
+  curl(endpoint:string):URL {
+      const uri = new URL(this.serverAddress)
+      const url = `${uri.protocol.startsWith('https') ? 'https' : 'http' }://${uri.host}${uri.pathname}${endpoint}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
+      return new URL(url)
+  }
+
   connect() {
     return new Promise<void>(async (resolve) => {
       if (this.ws) {
         await this.disconnect();
       }
 
-      const url = `ws://${this.serverAddress}/ws?clientId=${this.clientId}`;
+      const uri = new URL(this.serverAddress)
+      const url = `${uri.protocol.startsWith('https') ? 'wss' : 'ws' }://${uri.host}${uri.pathname}ws${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
 
       logger.info(`Connecting to url: ${url}`);
 
@@ -83,7 +91,7 @@ export class ComfyUIClient {
   }
 
   async getEmbeddings(): Promise<string[]> {
-    const res = await fetch(`http://${this.serverAddress}/embeddings`);
+    const res = await fetch(this.curl(`embeddings`));
 
     const json: string[] | ResponseError = await res.json();
 
@@ -95,7 +103,7 @@ export class ComfyUIClient {
   }
 
   async getExtensions(): Promise<string[]> {
-    const res = await fetch(`http://${this.serverAddress}/extensions`);
+    const res = await fetch(this.curl(`extensions`));
 
     const json: string[] | ResponseError = await res.json();
 
@@ -107,7 +115,7 @@ export class ComfyUIClient {
   }
 
   async queuePrompt(prompt: Prompt): Promise<QueuePromptResult> {
-    const res = await fetch(`http://${this.serverAddress}/prompt`, {
+    const res = await fetch(this.curl(`prompt`), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -129,7 +137,7 @@ export class ComfyUIClient {
   }
 
   async interrupt(): Promise<void> {
-    const res = await fetch(`http://${this.serverAddress}/interrupt`, {
+    const res = await fetch(this.curl(`interrupt`), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -145,7 +153,7 @@ export class ComfyUIClient {
   }
 
   async editHistory(params: EditHistoryRequest): Promise<void> {
-    const res = await fetch(`http://${this.serverAddress}/history`, {
+    const res = await fetch(this.curl(`history`), {
       method: 'POST',
       headers: {
         Accept: 'application/json',
@@ -172,8 +180,8 @@ export class ComfyUIClient {
     if (overwrite !== undefined) {
       formData.append('overwrite', overwrite.toString());
     }
-
-    const res = await fetch(`http://${this.serverAddress}/upload/image`, {
+    const url = this.curl(`upload/image`)
+    const res = await fetch( url, {
       method: 'POST',
       body: formData,
     });
@@ -201,7 +209,7 @@ export class ComfyUIClient {
       formData.append('overwrite', overwrite.toString());
     }
 
-    const res = await fetch(`http://${this.serverAddress}/upload/mask`, {
+    const res = await fetch(this.curl(`upload/mask`), {
       method: 'POST',
       body: formData,
     });
@@ -220,14 +228,13 @@ export class ComfyUIClient {
     subfolder: string,
     type: string,
   ): Promise<Blob> {
-    const res = await fetch(
-      `http://${this.serverAddress}/view?` +
-        new URLSearchParams({
-          filename,
-          subfolder,
-          type,
-        }),
-    );
+    const params = new URLSearchParams({
+      filename,
+      subfolder,
+      type,
+    })
+    const url = this.curl(`view`) + '&' + params.toString()
+    const res = await fetch(new URL(url));
 
     const blob = await res.blob();
     return blob;
@@ -237,9 +244,9 @@ export class ComfyUIClient {
     folderName: FolderName,
     filename: string,
   ): Promise<ViewMetadataResponse> {
-    const res = await fetch(
-      `http://${this.serverAddress}/view_metadata/${folderName}?filename=${filename}`,
-    );
+      const uri = new URL(this.serverAddress)
+      const url = `${uri.protocol.startsWith('https') ? 'https' : 'http' }://${uri.host}${uri.pathname}/view_metadata/${folderName}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}&filename=${filename}`;
+    const res = await fetch( url );
 
     const json: ViewMetadataResponse | ResponseError = await res.json();
 
@@ -251,7 +258,7 @@ export class ComfyUIClient {
   }
 
   async getSystemStats(): Promise<SystemStatsResponse> {
-    const res = await fetch(`http://${this.serverAddress}/system_stats`);
+    const res = await fetch(this.curl(`system_stats`));
 
     const json: SystemStatsResponse | ResponseError = await res.json();
 
@@ -263,7 +270,7 @@ export class ComfyUIClient {
   }
 
   async getPrompt(): Promise<PromptQueueResponse> {
-    const res = await fetch(`http://${this.serverAddress}/prompt`);
+    const res = await fetch(this.curl(`prompt`));
 
     const json: PromptQueueResponse | ResponseError = await res.json();
 
@@ -276,8 +283,8 @@ export class ComfyUIClient {
 
   async getObjectInfo(nodeClass?: string): Promise<ObjectInfoResponse> {
     const res = await fetch(
-      `http://${this.serverAddress}/object_info` +
-        (nodeClass ? `/${nodeClass}` : ''),
+      this.curl(`object_info` +
+        (nodeClass ? `/${nodeClass}` : '')),
     );
 
     const json: ObjectInfoResponse | ResponseError = await res.json();
@@ -291,7 +298,7 @@ export class ComfyUIClient {
 
   async getHistory(promptId?: string): Promise<HistoryResult> {
     const res = await fetch(
-      `http://${this.serverAddress}/history` + (promptId ? `/${promptId}` : ''),
+      this.curl(`history` + (promptId ? `/${promptId}` : '')),
     );
 
     const json: HistoryResult | ResponseError = await res.json();
@@ -304,7 +311,7 @@ export class ComfyUIClient {
   }
 
   async getQueue(): Promise<QueueResponse> {
-    const res = await fetch(`http://${this.serverAddress}/queue`);
+    const res = await fetch(this.curl(`queue`));
 
     const json: QueueResponse | ResponseError = await res.json();
 
