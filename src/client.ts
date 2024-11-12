@@ -70,7 +70,12 @@ export class ComfyUIClient {
       const basicToken = Buffer.from(`${this.options.basicAuth.user}:${this.options.basicAuth.password}`).toString('base64');
       options.headers.Authorization = `Basic ${basicToken}`
     }
+    console.log('CFETCH options', options);
     const res = await fetch(url, options);
+    if (res.status !== 200) {
+      console.error('COMFY RESULT !== 200', res)
+      return null
+    }
     const json = await res.json();
     if (!json || 'error' in json) {
       logger.error('cfetch error', json)
