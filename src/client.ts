@@ -16,11 +16,12 @@ import type {
   PromptQueueResponse,
   QueuePromptResult,
   QueueResponse,
-  ResponseError,
+  // ResponseError,
   SystemStatsResponse,
   UploadImageResult,
   ViewMetadataResponse,
   ComfyUIClientOptions,
+  Headers,
 } from './types.js';
 
 // TODO: Make logger customizable
@@ -42,10 +43,40 @@ export class ComfyUIClient {
   }
 
   // Comfy URL
-  curl(endpoint: string): URL {
+  curl(endpoint = ''): URL {
     const uri = new URL(this.serverAddress)
     const url = `${uri.protocol.startsWith('https') ? 'https' : 'http'}://${uri.host}${uri.pathname}${endpoint}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
     return new URL(url)
+  }
+
+  // Comfy fetch
+  async cfetch(endpoint: string, requestMethod = 'GET', data?: any, noStringify = false) {
+    const url = this.curl(endpoint)
+    const method = data || requestMethod === 'POST' ? 'POST' : 'GET'
+    const headers: Headers = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    }
+    const options = {
+      method,
+      headers,
+      body: data
+        ? noStringify
+          ? data
+          : JSON.stringify(data)
+        : undefined,
+    }
+    if (this.options && this.options.basicAuth) {
+      const basicToken = Buffer.from(`${this.options.basicAuth.user}:${this.options.basicAuth.password}`).toString('base64');
+      options.headers.Authorization = `Basic ${basicToken}`
+    }
+    const res = await fetch(url, options);
+    const json = await res.json();
+    if (!json || 'error' in json) {
+      logger.error('cfetch error', json)
+      return null
+    }
+    return json;
   }
 
   connect() {
@@ -56,9 +87,7 @@ export class ComfyUIClient {
       // flag for promise been resolved
       let resolved = false;
 
-      const uri = new URL(this.serverAddress)
-      const url = `${uri.protocol.startsWith('https') ? 'wss' : 'ws'}://${uri.host}${uri.pathname}ws${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
-
+      const url = this.curl()
       logger.info(`Connecting to url: ${url}`);
 
       const options = {
@@ -89,6 +118,9 @@ export class ComfyUIClient {
 
       this.ws.on('error', (err) => {
         logger.error({ err }, 'WebSockets error');
+        if (resolved) return;
+        resolved = true;
+        resolve();
       });
 
       this.ws.on('message', (data, isBinary) => {
@@ -109,82 +141,26 @@ export class ComfyUIClient {
   }
 
   async getEmbeddings(): Promise<string[]> {
-    const res = await fetch(this.curl(`embeddings`));
-
-    const json: string[] | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('embeddings')
   }
 
   async getExtensions(): Promise<string[]> {
-    const res = await fetch(this.curl(`extensions`));
-
-    const json: string[] | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('extensions')
   }
 
   async queuePrompt(prompt: Prompt): Promise<QueuePromptResult> {
-    const res = await fetch(this.curl(`prompt`), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        client_id: this.clientId,
-      }),
-    });
-
-    const json: QueuePromptResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('prompt', 'POST', {
+      prompt,
+      client_id: this.clientId,
+    })
   }
 
   async interrupt(): Promise<void> {
-    const res = await fetch(this.curl(`interrupt`), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-    });
-
-    const json: QueuePromptResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
+    return this.cfetch('interrupt', 'POST')
   }
 
   async editHistory(params: EditHistoryRequest): Promise<void> {
-    const res = await fetch(this.curl(`history`), {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(params),
-    });
-
-    const json: QueuePromptResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
+    return this.cfetch('history', 'POST', params)
   }
 
   async uploadImage(
@@ -198,19 +174,7 @@ export class ComfyUIClient {
     if (overwrite !== undefined) {
       formData.append('overwrite', overwrite.toString());
     }
-    const url = this.curl(`upload/image`)
-    const res = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
-
-    const json: UploadImageResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('upload/image', 'POST', formData, true)
   }
 
   async uploadMask(
@@ -227,18 +191,7 @@ export class ComfyUIClient {
       formData.append('overwrite', overwrite.toString());
     }
 
-    const res = await fetch(this.curl(`upload/mask`), {
-      method: 'POST',
-      body: formData,
-    });
-
-    const json: UploadImageResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('upload/mask', 'POST', formData, true)
   }
 
   async getImage(
@@ -252,92 +205,37 @@ export class ComfyUIClient {
       type,
     })
     const url = this.curl(`view`) + '&' + params.toString()
-    const res = await fetch(new URL(url));
+    const res = await this.cfetch(url);
 
     const blob = await res.blob();
     return blob;
   }
 
-  async viewMetadata(
-    folderName: FolderName,
-    filename: string,
-  ): Promise<ViewMetadataResponse> {
-    const uri = new URL(this.serverAddress)
-    const url = `${uri.protocol.startsWith('https') ? 'https' : 'http'}://${uri.host}${uri.pathname}/view_metadata/${folderName}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}&filename=${filename}`;
-    const res = await fetch(url);
-
-    const json: ViewMetadataResponse | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+  async viewMetadata(folderName: FolderName, filename: string,): Promise<ViewMetadataResponse> {
+    const url = this.curl(`view_metadata/${folderName}`) + (filename ? `&filename=${filename}` : '')
+    return this.cfetch(url)
   }
 
   async getSystemStats(): Promise<SystemStatsResponse> {
-    const res = await fetch(this.curl(`system_stats`));
-
-    const json: SystemStatsResponse | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('system_start')
   }
 
   async getPrompt(): Promise<PromptQueueResponse> {
-    const res = await fetch(this.curl(`prompt`));
-
-    const json: PromptQueueResponse | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch('prompt')
   }
 
   async getObjectInfo(nodeClass?: string): Promise<ObjectInfoResponse> {
-    const res = await fetch(
-      this.curl(`object_info` +
-        (nodeClass ? `/${nodeClass}` : '')),
-    );
-
-    const json: ObjectInfoResponse | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    const endpoint = `object_info${nodeClass ? '/' + nodeClass : ''} : ''`;
+    return this.cfetch(endpoint);
   }
 
+
   async getHistory(promptId?: string): Promise<HistoryResult> {
-    const res = await fetch(
-      this.curl(`history` + (promptId ? `/${promptId}` : '')),
-    );
-
-    const json: HistoryResult | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch(`history` + (promptId ? `/${promptId}` : ""));
   }
 
   async getQueue(): Promise<QueueResponse> {
-    const res = await fetch(this.curl(`queue`));
-
-    const json: QueueResponse | ResponseError = await res.json();
-
-    if ('error' in json) {
-      throw new Error(JSON.stringify(json));
-    }
-
-    return json;
+    return this.cfetch(`queue`)
   }
 
   async saveImages(response: ImagesResponse, outputDir: string) {

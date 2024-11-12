@@ -15,6 +15,10 @@ export interface NodeInfo {
   };
 }
 
+export interface Headers {
+  [headerName: string]: string;
+}
+
 export interface Prompt {
   [nodeId: string]: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
