@@ -20,6 +20,7 @@ import type {
   SystemStatsResponse,
   UploadImageResult,
   ViewMetadataResponse,
+  ComfyUIClientOptions,
 } from './types.js';
 
 // TODO: Make logger customizable
@@ -30,19 +31,21 @@ const logger = pino({
 export class ComfyUIClient {
   public serverAddress: string;
   public clientId: string;
+  public options: ComfyUIClientOptions | undefined;
 
   protected ws?: WebSocket;
 
-  constructor(serverAddress: string, clientId: string) {
+  constructor(serverAddress: string, clientId: string, options?: ComfyUIClientOptions) {
     this.serverAddress = serverAddress;
     this.clientId = clientId;
+    this.options = options;
   }
 
   // Comfy URL
-  curl(endpoint:string):URL {
-      const uri = new URL(this.serverAddress)
-      const url = `${uri.protocol.startsWith('https') ? 'https' : 'http' }://${uri.host}${uri.pathname}${endpoint}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
-      return new URL(url)
+  curl(endpoint: string): URL {
+    const uri = new URL(this.serverAddress)
+    const url = `${uri.protocol.startsWith('https') ? 'https' : 'http'}://${uri.host}${uri.pathname}${endpoint}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
+    return new URL(url)
   }
 
   connect() {
@@ -50,23 +53,38 @@ export class ComfyUIClient {
       if (this.ws) {
         await this.disconnect();
       }
+      // flag for promise been resolved
+      let resolved = false;
 
       const uri = new URL(this.serverAddress)
-      const url = `${uri.protocol.startsWith('https') ? 'wss' : 'ws' }://${uri.host}${uri.pathname}ws${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
+      const url = `${uri.protocol.startsWith('https') ? 'wss' : 'ws'}://${uri.host}${uri.pathname}ws${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
 
       logger.info(`Connecting to url: ${url}`);
 
-      this.ws = new WebSocket(url, {
+      const options = {
         perMessageDeflate: false,
-      });
+        headers: {}
+      };
+      if (this.options && this.options.basicAuth) {
+        const basicToken = Buffer.from(`${this.options.basicAuth.user}:${this.options.basicAuth.password}`).toString('base64');
+        options.headers = {
+          Authorization: `Basic ${basicToken}`,
+        }
+      }
+      this.ws = new WebSocket(url, options);
 
       this.ws.on('open', () => {
         logger.info('Connection open');
+        if (resolved) return;
+        resolved = true;
         resolve();
       });
 
       this.ws.on('close', () => {
         logger.info('Connection closed');
+        if (resolved) return;
+        resolved = true;
+        resolve();
       });
 
       this.ws.on('error', (err) => {
@@ -181,7 +199,7 @@ export class ComfyUIClient {
       formData.append('overwrite', overwrite.toString());
     }
     const url = this.curl(`upload/image`)
-    const res = await fetch( url, {
+    const res = await fetch(url, {
       method: 'POST',
       body: formData,
     });
@@ -244,9 +262,9 @@ export class ComfyUIClient {
     folderName: FolderName,
     filename: string,
   ): Promise<ViewMetadataResponse> {
-      const uri = new URL(this.serverAddress)
-      const url = `${uri.protocol.startsWith('https') ? 'https' : 'http' }://${uri.host}${uri.pathname}/view_metadata/${folderName}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}&filename=${filename}`;
-    const res = await fetch( url );
+    const uri = new URL(this.serverAddress)
+    const url = `${uri.protocol.startsWith('https') ? 'https' : 'http'}://${uri.host}${uri.pathname}/view_metadata/${folderName}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}&filename=${filename}`;
+    const res = await fetch(url);
 
     const json: ViewMetadataResponse | ResponseError = await res.json();
 

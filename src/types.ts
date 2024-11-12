@@ -1,3 +1,12 @@
+export interface Credentials {
+  user: string;
+  password: string;
+}
+
+export interface ComfyUIClientOptions {
+  basicAuth?: Credentials;
+}
+
 export interface NodeInfo {
   class_type: string;
   inputs: {
