@@ -8,6 +8,14 @@ export interface ComfyUIClientOptions {
   secure?: boolean;
 }
 
+export interface ComfyFetchParams {
+  method: string;
+  data?: BodyInit | null | undefined;
+  searchParams?: URLSearchParams;
+  json?: boolean;
+  blob?: boolean;
+}
+
 export interface NodeInfo {
   class_type: string;
   inputs: {

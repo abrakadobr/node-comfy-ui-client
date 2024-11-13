@@ -8,6 +8,13 @@ interface ComfyUIClientOptions {
     basicAuth?: Credentials;
     secure?: boolean;
 }
+interface ComfyFetchParams {
+    method: string;
+    data?: BodyInit | null | undefined;
+    searchParams?: URLSearchParams;
+    json?: boolean;
+    blob?: boolean;
+}
 interface NodeInfo {
     class_type: string;
     inputs: {
@@ -123,7 +130,7 @@ declare class ComfyUIClient {
     protected ws?: WebSocket;
     constructor(serverAddress: string, clientId: string, options?: ComfyUIClientOptions);
     curl(endpoint?: string): URL;
-    cfetch(endpoint: string, requestMethod?: string, data?: any, noStringify?: boolean): Promise<any>;
+    cfetch(endpoint: string, params?: ComfyFetchParams): Promise<any>;
     connect(): Promise<void>;
     disconnect(): Promise<void>;
     getEmbeddings(): Promise<string[]>;
@@ -144,4 +151,4 @@ declare class ComfyUIClient {
     getImages(prompt: Prompt): Promise<ImagesResponse>;
 }
 
-export { ComfyUIClient, ComfyUIClientOptions, ComfyUIError, Credentials, DeviceStats, EditHistoryRequest, ExecInfo, FolderName, Headers, HistoryResult, ImageContainer, ImageRef, ImagesResponse, NodeInfo, ObjectInfo, ObjectInfoResponse, OutputImage, Prompt, PromptHistory, PromptQueueResponse, QueueData, QueueDataPrimitives, QueuePromptResult, QueueResponse, ResponseError, SystemStatsResponse, UploadImageResult, ViewMetadataResponse };
+export { ComfyFetchParams, ComfyUIClient, ComfyUIClientOptions, ComfyUIError, Credentials, DeviceStats, EditHistoryRequest, ExecInfo, FolderName, Headers, HistoryResult, ImageContainer, ImageRef, ImagesResponse, NodeInfo, ObjectInfo, ObjectInfoResponse, OutputImage, Prompt, PromptHistory, PromptQueueResponse, QueueData, QueueDataPrimitives, QueuePromptResult, QueueResponse, ResponseError, SystemStatsResponse, UploadImageResult, ViewMetadataResponse };

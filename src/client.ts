@@ -21,6 +21,7 @@ import type {
   UploadImageResult,
   ViewMetadataResponse,
   ComfyUIClientOptions,
+  ComfyFetchParams,
   Headers,
 } from './types.js';
 
@@ -49,9 +50,13 @@ export class ComfyUIClient {
   }
 
   // Comfy fetch
-  async cfetch(endpoint: string, requestMethod = 'GET', data?: any, noStringify = false) {
+  async cfetch(endpoint: string, params: ComfyFetchParams = {
+    method: 'GET',
+    json: true
+  }) {
     const url = this.curl(endpoint)
-    const method = data || requestMethod === 'POST' ? 'POST' : 'GET'
+    if (params.searchParams) url.search = params.searchParams.toString()
+    const method = params.data || params.method === 'POST' ? 'POST' : 'GET'
     const headers: Headers = {
       Accept: 'application/json',
       'Content-Type': 'application/json',
@@ -59,11 +64,7 @@ export class ComfyUIClient {
     const options = {
       method,
       headers,
-      body: data
-        ? noStringify
-          ? data
-          : JSON.stringify(data)
-        : undefined,
+      body: params.data || undefined
     }
     if (this.options && this.options.basicAuth) {
       const basicToken = Buffer.from(`${this.options.basicAuth.user}:${this.options.basicAuth.password}`).toString('base64');
@@ -74,12 +75,19 @@ export class ComfyUIClient {
       console.error('COMFY RESULT !== 200', res)
       return null
     }
-    const json = await res.json();
-    if (!json || 'error' in json) {
-      logger.error('cfetch error', json)
-      return null
+    if (params.json) {
+      const json = await res.json();
+      if (!json || 'error' in json) {
+        logger.error('cfetch error', json)
+        return null
+      }
+      return json;
     }
-    return json;
+    if (params.blob) {
+      const blob = await res.blob();
+      return blob
+    }
+    return null
   }
 
   connect() {
@@ -149,18 +157,21 @@ export class ComfyUIClient {
   }
 
   async queuePrompt(prompt: Prompt): Promise<QueuePromptResult> {
-    return this.cfetch('prompt', 'POST', {
-      prompt,
-      client_id: this.clientId,
+    return this.cfetch('prompt', {
+      method: 'POST',
+      data: JSON.stringify({
+        prompt,
+        client_id: this.clientId,
+      }),
     })
   }
 
   async interrupt(): Promise<void> {
-    return this.cfetch('interrupt', 'POST')
+    return this.cfetch('interrupt', { method: 'POST' })
   }
 
   async editHistory(params: EditHistoryRequest): Promise<void> {
-    return this.cfetch('history', 'POST', params)
+    return this.cfetch('history', { method: 'POST', data: JSON.stringify(params) })
   }
 
   async uploadImage(
@@ -174,7 +185,10 @@ export class ComfyUIClient {
     if (overwrite !== undefined) {
       formData.append('overwrite', overwrite.toString());
     }
-    return this.cfetch('upload/image', 'POST', formData, true)
+    return this.cfetch('upload/image', {
+      method: 'POST',
+      data: formData
+    })
   }
 
   async uploadMask(
@@ -189,7 +203,10 @@ export class ComfyUIClient {
     if (overwrite !== undefined) {
       formData.append('overwrite', overwrite.toString());
     }
-    return this.cfetch('upload/mask', 'POST', formData, true)
+    return this.cfetch('upload/mask', {
+      method: 'POST',
+      data: formData
+    })
   }
 
   async getImage(
@@ -202,16 +219,22 @@ export class ComfyUIClient {
       subfolder,
       type,
     })
-    const url = this.curl(`view`) + '&' + params.toString()
-    const res = await this.cfetch(url);
-    if (!res) return res
-    const blob = await res.blob();
+    // const url = this.curl(`view`) + '&' + params.toString()
+    const blob = await this.cfetch('view', {
+      method: 'GET',
+      searchParams: params,
+      json: false,
+      blob: true
+    });
     return blob;
   }
 
   async viewMetadata(folderName: FolderName, filename: string,): Promise<ViewMetadataResponse> {
-    const url = this.curl(`view_metadata/${folderName}`) + (filename ? `&filename=${filename}` : '')
-    return this.cfetch(url)
+    const searchParams = new URLSearchParams({ filename })
+    return this.cfetch(`view_metadata/${folderName}`, {
+      method: 'GET',
+      searchParams
+    })
   }
 
   async getSystemStats(): Promise<SystemStatsResponse> {
@@ -240,7 +263,6 @@ export class ComfyUIClient {
     for (const nodeId of Object.keys(response || {})) {
       for (const img of response[nodeId]) {
         const arrayBuffer = await img.blob.arrayBuffer();
-
         const outputPath = join(outputDir, img.image.filename);
         await writeFile(outputPath, Buffer.from(arrayBuffer));
       }
