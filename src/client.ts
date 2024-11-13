@@ -163,6 +163,7 @@ export class ComfyUIClient {
         prompt,
         client_id: this.clientId,
       }),
+      json: true
     })
   }
 
@@ -187,7 +188,8 @@ export class ComfyUIClient {
     }
     return this.cfetch('upload/image', {
       method: 'POST',
-      data: formData
+      data: formData,
+      json: true
     })
   }
 
@@ -205,7 +207,8 @@ export class ComfyUIClient {
     }
     return this.cfetch('upload/mask', {
       method: 'POST',
-      data: formData
+      data: formData,
+      json: true
     })
   }
 
@@ -233,7 +236,8 @@ export class ComfyUIClient {
     const searchParams = new URLSearchParams({ filename })
     return this.cfetch(`view_metadata/${folderName}`, {
       method: 'GET',
-      searchParams
+      searchParams,
+      json: true
     })
   }
 
