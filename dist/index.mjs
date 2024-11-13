@@ -126,7 +126,8 @@ var ComfyUIClient = class {
       data: JSON.stringify({
         prompt,
         client_id: this.clientId
-      })
+      }),
+      json: true
     });
   }
   async interrupt() {
@@ -143,7 +144,8 @@ var ComfyUIClient = class {
     }
     return this.cfetch("upload/image", {
       method: "POST",
-      data: formData
+      data: formData,
+      json: true
     });
   }
   async uploadMask(image, filename, originalRef, overwrite) {
@@ -155,7 +157,8 @@ var ComfyUIClient = class {
     }
     return this.cfetch("upload/mask", {
       method: "POST",
-      data: formData
+      data: formData,
+      json: true
     });
   }
   async getImage(filename, subfolder, type) {
@@ -176,7 +179,8 @@ var ComfyUIClient = class {
     const searchParams = new URLSearchParams({ filename });
     return this.cfetch(`view_metadata/${folderName}`, {
       method: "GET",
-      searchParams
+      searchParams,
+      json: true
     });
   }
   async getSystemStats() {
