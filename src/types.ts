@@ -5,6 +5,7 @@ export interface Credentials {
 
 export interface ComfyUIClientOptions {
   basicAuth?: Credentials;
+  secure?: boolean;
 }
 
 export interface NodeInfo {

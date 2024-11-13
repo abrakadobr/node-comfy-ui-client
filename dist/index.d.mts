@@ -6,6 +6,7 @@ interface Credentials {
 }
 interface ComfyUIClientOptions {
     basicAuth?: Credentials;
+    secure?: boolean;
 }
 interface NodeInfo {
     class_type: string;

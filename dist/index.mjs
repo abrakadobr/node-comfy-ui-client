@@ -18,8 +18,7 @@ var ComfyUIClient = class {
   }
   // Comfy URL
   curl(endpoint = "") {
-    const uri = new URL(this.serverAddress);
-    const url = `${uri.protocol.startsWith("https") ? "https" : "http"}://${uri.host}${uri.pathname}${endpoint}${uri.search || ""}${uri.search ? "&" : "?"}clientId=${this.clientId}`;
+    const url = `${this.options?.secure ? "https" : "http"}://${this.serverAddress}/${endpoint}&clientId=${this.clientId}`;
     return new URL(url);
   }
   // Comfy fetch
@@ -58,8 +57,8 @@ var ComfyUIClient = class {
         await this.disconnect();
       }
       let resolved = false;
-      const url = this.curl();
-      logger.info(`Connecting to url: ${url}`);
+      const url = `${this.options?.secure ? "wss" : "ws"}://${this.serverAddress}/ws&clientId=${this.clientId}`;
+      logger.info(`Socket to: ${url}`);
       const options = {
         perMessageDeflate: false,
         headers: {}

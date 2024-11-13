@@ -44,8 +44,7 @@ export class ComfyUIClient {
 
   // Comfy URL
   curl(endpoint = ''): URL {
-    const uri = new URL(this.serverAddress)
-    const url = `${uri.protocol.startsWith('https') ? 'https' : 'http'}://${uri.host}${uri.pathname}${endpoint}${uri.search || ''}${uri.search ? '&' : '?'}clientId=${this.clientId}`;
+    const url = `${this.options?.secure ? 'https' : 'http'}://${this.serverAddress}/${endpoint}&clientId=${this.clientId}`;
     return new URL(url)
   }
 
@@ -92,8 +91,8 @@ export class ComfyUIClient {
       // flag for promise been resolved
       let resolved = false;
 
-      const url = this.curl()
-      logger.info(`Connecting to url: ${url}`);
+      const url = `${this.options?.secure ? 'wss' : 'ws'}://${this.serverAddress}/ws&clientId=${this.clientId}`
+      logger.info(`Socket to: ${url}`);
 
       const options = {
         perMessageDeflate: false,
