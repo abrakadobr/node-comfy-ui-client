@@ -18,7 +18,7 @@ var ComfyUIClient = class {
   }
   // Comfy URL
   curl(endpoint = "") {
-    const url = `${this.options?.secure ? "https" : "http"}://${this.serverAddress}/${endpoint}&clientId=${this.clientId}`;
+    const url = `${this.options?.secure ? "https" : "http"}://${this.serverAddress}/${endpoint}?clientId=${this.clientId}`;
     return new URL(url);
   }
   // Comfy fetch
@@ -38,7 +38,6 @@ var ComfyUIClient = class {
       const basicToken = Buffer.from(`${this.options.basicAuth.user}:${this.options.basicAuth.password}`).toString("base64");
       options.headers.Authorization = `Basic ${basicToken}`;
     }
-    console.log("CFETCH options", options);
     const res = await fetch(url, options);
     if (res.status !== 200) {
       console.error("COMFY RESULT !== 200", res);
@@ -57,8 +56,7 @@ var ComfyUIClient = class {
         await this.disconnect();
       }
       let resolved = false;
-      const url = `${this.options?.secure ? "wss" : "ws"}://${this.serverAddress}/ws&clientId=${this.clientId}`;
-      logger.info(`Socket to: ${url}`);
+      const url = `${this.options?.secure ? "wss" : "ws"}://${this.serverAddress}/ws?clientId=${this.clientId}`;
       const options = {
         perMessageDeflate: false,
         headers: {}
@@ -71,14 +69,12 @@ var ComfyUIClient = class {
       }
       this.ws = new WebSocket(url, options);
       this.ws.on("open", () => {
-        logger.info("Connection open");
         if (resolved)
           return;
         resolved = true;
         resolve();
       });
       this.ws.on("close", () => {
-        logger.info("Connection closed");
         if (resolved)
           return;
         resolved = true;
@@ -149,6 +145,8 @@ var ComfyUIClient = class {
     });
     const url = this.curl(`view`) + "&" + params.toString();
     const res = await this.cfetch(url);
+    if (!res)
+      return res;
     const blob = await res.blob();
     return blob;
   }
@@ -173,7 +171,7 @@ var ComfyUIClient = class {
     return this.cfetch(`queue`);
   }
   async saveImages(response, outputDir) {
-    for (const nodeId of Object.keys(response)) {
+    for (const nodeId of Object.keys(response || {})) {
       for (const img of response[nodeId]) {
         const arrayBuffer = await img.blob.arrayBuffer();
         const outputPath = join(outputDir, img.image.filename);
@@ -188,6 +186,8 @@ var ComfyUIClient = class {
       );
     }
     const queue = await this.queuePrompt(prompt);
+    if (!queue)
+      return {};
     const promptId = queue.prompt_id;
     return new Promise((resolve, reject) => {
       const outputImages = {};
@@ -200,8 +200,6 @@ var ComfyUIClient = class {
           if (message.type === "executing") {
             const messageData = message.data;
             if (!messageData.node) {
-              const donePromptId = messageData.prompt_id;
-              logger.info(`Done executing prompt (ID: ${donePromptId})`);
               if (messageData.prompt_id === promptId) {
                 const historyRes = await this.getHistory(promptId);
                 const history = historyRes[promptId];
